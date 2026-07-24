@@ -5,6 +5,8 @@
 static pumpkin_plugin_t g_plugin = {0};
 static pumpkin_event_handler_t *g_event_handlers = NULL;
 static size_t g_event_handler_count = 0;
+static pumpkin_task_handler_t *g_task_handlers = NULL;
+static size_t g_task_handler_count = 0;
 
 void pumpkin_register_plugin(pumpkin_plugin_t plugin) {
     g_plugin = plugin;
@@ -46,6 +48,62 @@ uint32_t pumpkin_register_event_handler(
     );
 
     return handler_id;
+}
+
+static uint32_t register_task_handler(pumpkin_task_handler_t handler) {
+    if (handler == NULL ||
+        g_task_handler_count >= UINT32_MAX ||
+        g_task_handler_count >= SIZE_MAX / sizeof(*g_task_handlers)) {
+        return PUMPKIN_INVALID_HANDLER_ID;
+    }
+
+    size_t new_count = g_task_handler_count + 1;
+    pumpkin_task_handler_t *handlers = realloc(
+        g_task_handlers,
+        new_count * sizeof(*handlers)
+    );
+    if (handlers == NULL) {
+        return PUMPKIN_INVALID_HANDLER_ID;
+    }
+
+    uint32_t handler_id = (uint32_t)g_task_handler_count;
+    g_task_handlers = handlers;
+    g_task_handlers[handler_id] = handler;
+    g_task_handler_count = new_count;
+
+    return handler_id;
+}
+
+uint32_t pumpkin_schedule_delayed_task(
+    uint64_t delay_ticks,
+    pumpkin_task_handler_t handler
+) {
+    uint32_t handler_id = register_task_handler(handler);
+    if (handler_id == PUMPKIN_INVALID_HANDLER_ID) {
+        return PUMPKIN_INVALID_TASK_ID;
+    }
+
+    return pumpkin_plugin_scheduler_schedule_delayed_task(
+        handler_id,
+        delay_ticks
+    );
+}
+
+uint32_t pumpkin_schedule_repeating_task(
+    uint64_t delay_ticks,
+    uint64_t period_ticks,
+    pumpkin_task_handler_t handler
+) {
+    uint32_t handler_id = register_task_handler(handler);
+    if (handler_id == PUMPKIN_INVALID_HANDLER_ID) {
+        return PUMPKIN_INVALID_TASK_ID;
+    }
+
+    return pumpkin_plugin_scheduler_schedule_repeating_task(
+        handler_id,
+        delay_ticks,
+        period_ticks
+    );
 }
 
 // WIT exports
@@ -94,6 +152,10 @@ bool exports_plugin_on_unload(plugin_own_context_t context_handle, plugin_string
     g_event_handlers = NULL;
     g_event_handler_count = 0;
 
+    free(g_task_handlers);
+    g_task_handlers = NULL;
+    g_task_handler_count = 0;
+
     return true;
 }
 
@@ -123,4 +185,11 @@ bool exports_plugin_handle_command(uint32_t command_id, plugin_own_command_sende
 }
 
 void exports_plugin_handle_task(uint32_t handler_id, plugin_own_server_instance_t server) {
+    if (handler_id < g_task_handler_count) {
+        g_task_handlers[handler_id](
+            pumpkin_plugin_server_borrow_server(server)
+        );
+    }
+
+    pumpkin_plugin_server_server_drop_own(server);
 }
