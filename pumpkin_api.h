@@ -27,6 +27,14 @@ typedef void (*pumpkin_on_load_t)(plugin_own_context_t ctx);
 typedef void (*pumpkin_on_unload_t)(plugin_own_context_t ctx);
 typedef pumpkin_metadata_t (*pumpkin_get_metadata_t)(void);
 
+typedef void (*pumpkin_event_handler_t)(
+    pumpkin_plugin_server_borrow_server_t server,
+    plugin_event_t *event
+);
+
+/** Returned when an event handler could not be registered. */
+#define PUMPKIN_INVALID_HANDLER_ID UINT32_MAX
+
 typedef struct {
     pumpkin_get_metadata_t get_metadata;
     pumpkin_on_load_t on_load;
@@ -34,6 +42,14 @@ typedef struct {
 } pumpkin_plugin_t;
 
 void pumpkin_register_plugin(pumpkin_plugin_t plugin);
+
+uint32_t pumpkin_register_event_handler(
+    pumpkin_plugin_context_borrow_context_t context,
+    pumpkin_event_handler_t handler,
+    pumpkin_plugin_context_event_type_t event_type,
+    pumpkin_plugin_context_event_priority_t event_priority,
+    bool blocking
+);
 
 #define REGISTER_PUMPKIN_PLUGIN(plugin) \
     void exports_plugin_init_plugin(void) { \
