@@ -3,9 +3,49 @@
 #include <string.h>
 
 static pumpkin_plugin_t g_plugin = {0};
+static pumpkin_event_handler_t *g_event_handlers = NULL;
+static size_t g_event_handler_count = 0;
 
 void pumpkin_register_plugin(pumpkin_plugin_t plugin) {
     g_plugin = plugin;
+}
+
+uint32_t pumpkin_register_event_handler(
+    pumpkin_plugin_context_borrow_context_t context,
+    pumpkin_event_handler_t handler,
+    pumpkin_plugin_context_event_type_t event_type,
+    pumpkin_plugin_context_event_priority_t event_priority,
+    bool blocking
+) {
+    if (handler == NULL ||
+        g_event_handler_count >= UINT32_MAX ||
+        g_event_handler_count >= SIZE_MAX / sizeof(*g_event_handlers)) {
+        return PUMPKIN_INVALID_HANDLER_ID;
+    }
+
+    size_t new_count = g_event_handler_count + 1;
+    pumpkin_event_handler_t *handlers = realloc(
+        g_event_handlers,
+        new_count * sizeof(*handlers)
+    );
+    if (handlers == NULL) {
+        return PUMPKIN_INVALID_HANDLER_ID;
+    }
+
+    uint32_t handler_id = (uint32_t)g_event_handler_count;
+    g_event_handlers = handlers;
+    g_event_handlers[handler_id] = handler;
+    g_event_handler_count = new_count;
+
+    pumpkin_plugin_context_method_context_register_event(
+        context,
+        handler_id,
+        event_type,
+        event_priority,
+        blocking
+    );
+
+    return handler_id;
 }
 
 // WIT exports
@@ -49,12 +89,25 @@ bool exports_plugin_on_unload(plugin_own_context_t context_handle, plugin_string
     if (g_plugin.on_unload) {
         g_plugin.on_unload(context_handle);
     }
+
+    free(g_event_handlers);
+    g_event_handlers = NULL;
+    g_event_handler_count = 0;
+
     return true;
 }
 
 void exports_plugin_handle_event(uint32_t event_id, plugin_own_server_instance_t server, plugin_event_t *event, plugin_event_t *ret) {
-    // Basic event pass-through
     *ret = *event;
+
+    if (event_id < g_event_handler_count) {
+        g_event_handlers[event_id](
+            pumpkin_plugin_server_borrow_server(server),
+            ret
+        );
+    }
+
+    pumpkin_plugin_server_server_drop_own(server);
 }
 
 bool exports_plugin_handle_command(uint32_t command_id, plugin_own_command_sender_t sender, plugin_own_server_instance_t server, plugin_own_consumed_args_t args, int32_t *ret, plugin_command_error_t *err) {

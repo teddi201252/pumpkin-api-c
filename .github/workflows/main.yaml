@@ -31,7 +31,7 @@ jobs:
         run: make install
 
       - name: Test
-        run: wasm32-wasip2-clang -o test_plugin.wasm -mexec-model=reactor -Iinstall/include install/lib/libpumpkin-api.a example/main.c
+        run: wasm32-wasip2-clang -Wall -Wextra -Werror -o test_plugin.wasm -mexec-model=reactor -Iinstall/include install/lib/libpumpkin-api.a example/main.c
 
       - name: Set ARTIFACT_NAME
         id: artifact-name
