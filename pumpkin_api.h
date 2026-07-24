@@ -32,6 +32,14 @@ typedef void (*pumpkin_event_handler_t)(
     plugin_event_t *event
 );
 
+typedef bool (*pumpkin_command_handler_t)(
+    pumpkin_plugin_command_borrow_command_sender_t sender,
+    pumpkin_plugin_server_borrow_server_t server,
+    pumpkin_plugin_command_borrow_consumed_args_t args,
+    int32_t *result,
+    plugin_command_error_t *error
+);
+
 /** Returned when an event handler could not be registered. */
 #define PUMPKIN_INVALID_HANDLER_ID UINT32_MAX
 
@@ -49,6 +57,16 @@ uint32_t pumpkin_register_event_handler(
     pumpkin_plugin_context_event_type_t event_type,
     pumpkin_plugin_context_event_priority_t event_priority,
     bool blocking
+);
+
+uint32_t pumpkin_command_execute(
+    pumpkin_plugin_command_borrow_command_t command,
+    pumpkin_command_handler_t handler
+);
+
+uint32_t pumpkin_command_node_execute(
+    pumpkin_plugin_command_borrow_command_node_t command_node,
+    pumpkin_command_handler_t handler
 );
 
 #define REGISTER_PUMPKIN_PLUGIN(plugin) \
