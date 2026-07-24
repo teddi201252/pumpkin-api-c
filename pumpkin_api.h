@@ -40,8 +40,15 @@ typedef bool (*pumpkin_command_handler_t)(
     plugin_command_error_t *error
 );
 
+typedef void (*pumpkin_task_handler_t)(
+    pumpkin_plugin_server_borrow_server_t server
+);
+
 /** Returned when an event handler could not be registered. */
 #define PUMPKIN_INVALID_HANDLER_ID UINT32_MAX
+
+/** Returned when a task could not be scheduled. */
+#define PUMPKIN_INVALID_TASK_ID UINT32_MAX
 
 typedef struct {
     pumpkin_get_metadata_t get_metadata;
@@ -67,6 +74,17 @@ uint32_t pumpkin_command_execute(
 uint32_t pumpkin_command_node_execute(
     pumpkin_plugin_command_borrow_command_node_t command_node,
     pumpkin_command_handler_t handler
+);
+
+uint32_t pumpkin_schedule_delayed_task(
+    uint64_t delay_ticks,
+    pumpkin_task_handler_t handler
+);
+
+uint32_t pumpkin_schedule_repeating_task(
+    uint64_t delay_ticks,
+    uint64_t period_ticks,
+    pumpkin_task_handler_t handler
 );
 
 #define REGISTER_PUMPKIN_PLUGIN(plugin) \
